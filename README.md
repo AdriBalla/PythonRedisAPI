@@ -31,10 +31,10 @@ make up
 |URL|Method|Attributes|Description|
 ---|---|---|---|
 localhost:5000/databases|GET||Displays all databases
-localhost:5000/databases/{databaseName}|GET||Displays all entry in a database
-localhost:5000/databases/{databaseName}/{key}|GET||Displays the value of the key from a database
-localhost:5000/databases/{databaseName}|POST,PUT|key,value|Insert or update the key value couple in a database
-localhost:5000/databases/{databaseName}/{key}|DELETE||Delete a key value couple from a database
+localhost:5000/databases/{databaseName}/data|GET||Displays all entry in a database
+localhost:5000/databases/{databaseName}/data/{key}|GET||Displays the value of the key from a database
+localhost:5000/databases/{databaseName}/data|POST,PUT|key,value|Insert or update the key value couple in a database
+localhost:5000/databases/{databaseName}/data/{key}|DELETE||Delete a key value couple from a database
 localhost:5000/databases/{databaseName}|DELETE||Delete a whole database
 
 

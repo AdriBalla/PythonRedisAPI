@@ -117,35 +117,36 @@ def check_status():
 	return json.dumps(returnValue)
 
 
-@app.route("/databases/", defaults={'key': None,'databaseName' : None}, methods=['GET'])
-@app.route("/databases/<databaseName>", defaults={'key': None}, methods=['GET'])
-@app.route("/databases/<databaseName>/<key>", methods=['GET'])
+@app.route("/databases/", methods=['GET'])
+def readAllDatabases():
+	return json.dumps(getAllDatabases())
+
+
+@app.route("/databases/<databaseName>/data", defaults={'key': None}, methods=['GET'])
+@app.route("/databases/<databaseName>/data/<key>", methods=['GET'])
 def readData(databaseName,key):
-	if (databaseName == None):
-		return json.dumps(getAllDatabases())
-	if (key != None):
-		return json.dumps({key:getData(databaseName,key)})
-	else:
+	if (key == None):
 		return json.dumps(getAllData(databaseName))
+	else:
+		return json.dumps({key:getData(databaseName,key)})
 
 
-
-@app.route("/databases/<databaseName>/", methods=['PUT','POST'])
+@app.route("/databases/<databaseName>/data", methods=['PUT','POST'])
 def addData(databaseName):
 	key = request.args.get('key')
 	value = request.args.get('value')
 	return json.dumps(setData(databaseName,key,value))
 
-
-
-@app.route("/databases/<databaseName>", defaults={'key': None}, methods=['DELETE'])
-@app.route("/databases/<databaseName>/<key>", methods=['DELETE'])
+@app.route("/databases/<databaseName>/data/<key>", methods=['DELETE'])
 def removeData(databaseName,key):
-	if (key != None):
-		return json.dumps(deleteData(databaseName,key))
-	else:
-		deleteAllData(databaseName)
-		return json.dumps(deleteDBIndex(databaseName))
+	return json.dumps(deleteData(databaseName,key))
+
+@app.route("/databases/<databaseName>", methods=['DELETE'])
+def removeDB(databaseName):
+	deleteAllData(databaseName)
+	return json.dumps(deleteDBIndex(databaseName))
+
+
 
 
 
