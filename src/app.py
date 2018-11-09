@@ -107,6 +107,11 @@ def deleteDBIndex(databaseName):
 	redisServer = getRedisDbRegistryServer()
 	return redisServer.delete(databaseName)
 
+#
+# Return the result success
+#
+def success():
+	return json.dumps("true");
 
 #
 # Routes
@@ -126,25 +131,37 @@ def readAllDatabases():
 @app.route("/databases/<databaseName>/data/<key>", methods=['GET'])
 def readData(databaseName,key):
 	if (key == None):
-		return json.dumps(getAllData(databaseName))
+		if request.args.get('keys'):
+			returnValue = {}
+			for key in json.loads(request.args.get('keys')):
+				returnValue[key] = getData(databaseName,key)
+			return json.dumps(returnValue)
+		else:
+			return json.dumps(getAllData(databaseName))
 	else:
 		return json.dumps({key:getData(databaseName,key)})
 
 
 @app.route("/databases/<databaseName>/data", methods=['PUT','POST'])
 def addData(databaseName):
-	key = request.args.get('key')
-	value = request.args.get('value')
-	return json.dumps(setData(databaseName,key,value))
+	if request.args.get('key') and request.args.get('value'):
+		setData(databaseName,request.args.get('key'),request.args.get('value'))
+	elif request.args.get('data'):
+		data = json.loads(request.args.get('data'))
+		for key in data:
+			setData(databaseName,key,data[key])
+	return success()
 
 @app.route("/databases/<databaseName>/data/<key>", methods=['DELETE'])
 def removeData(databaseName,key):
-	return json.dumps(deleteData(databaseName,key))
+	deleteData(databaseName,key)
+	return success()
 
 @app.route("/databases/<databaseName>", methods=['DELETE'])
 def removeDB(databaseName):
 	deleteAllData(databaseName)
-	return json.dumps(deleteDBIndex(databaseName))
+	deleteDBIndex(databaseName)
+	return success()
 
 
 
