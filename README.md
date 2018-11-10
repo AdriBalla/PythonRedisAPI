@@ -42,6 +42,7 @@ API address : localhost:5000
 /databases/{databaseName}/data|POST,PUT|key,value|Insert or update the key value couple in a database
 /databases/{databaseName}/data|POST,PUT|data (Json encoded dictionary)|Insert or update the key value couples encoded in a Json dictionary into a database
 /databases/{databaseName}/data/{key}|DELETE||Delete a key value couple from a database
+/databases/{databaseName}/data/{key}|DELETE|keys (Json encoded array of keys)|Delete a batch of key value couple from a database
 /databases/{databaseName}|DELETE||Delete a whole database
 
 ## Result

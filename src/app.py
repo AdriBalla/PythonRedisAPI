@@ -45,56 +45,58 @@ def getRedisServer(databaseName,readOnly=False):
 	return redis.Redis(connection_pool=pool)
 
 #
-# Add an entry to a Redis Server according to the database name
+# Get all entry to Redis Server according to the database Name
 #
-def setData(databaseName,key,value):
-	redisServer = getRedisServer(databaseName)
-	return redisServer.set(key, value)
+def getAllDatabases():
+	redisServer = getRedisDbRegistryServer()
+	return redisServer.keys()
+
 
 #
-# Add an entry to a Redis Server according to the database name and the key
+# Add a batch of entry as dictionary to a Redis Server according to the database name
 #
-def getData(databaseName,key):
+def setData(databaseName,dictionary):
+	redisServer = getRedisServer(databaseName)
+	for key in dictionary:
+	   redisServer.set(key, dictionary[key])
+
+#
+# Get entries to a Redis Server according to the database name and array of keys
+#
+def getData(databaseName,keys):
+	returnValue = {}
 	redisServer = getRedisServer(databaseName,True)
-	return redisServer.get(key)
-
-
-#
-# Delete an entry to a Redis Server according to the database name and the key
-#
-def deleteData(databaseName,key):
-	redisServer = getRedisServer(databaseName)
-	return redisServer.delete(key)
-
+	for key in keys:
+		returnValue[key] = redisServer.get(key)
+	return returnValue
 
 #
 # Get all entry to Redis Server according to the database Name
 #
 def getAllData(databaseName):
-	returnValue = {}
 	redisServer = getRedisServer(databaseName,True)
-	for key in redisServer.keys():
-		returnValue[key] = redisServer.get(key)
+	returnValue = getData(databaseName,redisServer.keys())
 	return returnValue
+
+
+#
+# Delete a batch of entries to a Redis Server according to the database name and an array of keys
+#
+def deleteData(databaseName,keys):
+	redisServer = getRedisServer(databaseName)
+	for key in keys:
+		redisServer.delete(key)
+
 
 #
 # Delete all entry to Redis Database according to database name
 #
 def deleteAllData(databaseName):
 	redisServer = getRedisServer(databaseName)
-	for key in redisServer.keys():
-		redisServer.delete(key)
+	deleteData(redisServer.keys())
 
 
-#
-# Get all entry to Redis Server according to the database Name
-#
-def getAllDatabases():
-	returnValue = {}
-	redisServer = getRedisDbRegistryServer()
-	for key in redisServer.keys():
-		returnValue[key] = redisServer.get(key)
-	return returnValue
+
 
 #
 # Get the index of a database in the registry of databases
@@ -145,9 +147,9 @@ def success():
 
 @app.errorhandler(Error)
 def handle_invalid_usage(error):
-    response = jsonify(error.to_dict())
-    response.status_code = error.status_code
-    return response
+	response = jsonify(error.to_dict())
+	response.status_code = error.status_code
+	return response
 
 #############
 # Routes
@@ -164,37 +166,57 @@ def readAllDatabases():
 	return jsonify(getAllDatabases())
 
 
+
 @app.route("/databases/<databaseName>/data", defaults={'key': None}, methods=['GET'])
 @app.route("/databases/<databaseName>/data/<key>", methods=['GET'])
 def readData(databaseName,key):
-	if key == None:
-		if request.args.get('keys'):
-			returnValue = {}
-			for key in json.loads(request.args.get('keys')):
-				returnValue[key] = getData(databaseName,key)
-			return jsonify(returnValue)
-		else:
-			return jsonify(getAllData(databaseName))
+	toRead = []
+	if key != None:
+		toRead.append(key)
+	elif request.args.get('keys'):
+		toRead = json.loads(request.args.get('keys'))
+
+	if toRead :
+		returnValue = getData(databaseName,toRead)
 	else:
-		return jsonify({key:getData(databaseName,key)})
+		returnValue = getAllData(databaseName)
+
+	return jsonify(returnValue);
+
+
 
 
 @app.route("/databases/<databaseName>/data", methods=['PUT','POST'])
 def addData(databaseName):
+	toAdd = {}
 	if request.args.get('key') and request.args.get('value'):
-		setData(databaseName,request.args.get('key'),request.args.get('value'))
+		toAdd[request.args.get('key')] = request.args.get('value')
 	elif request.args.get('data'):
-		data = json.loads(request.args.get('data'))
-		for key in data:
-			setData(databaseName,key,data[key])
+		toAdd = json.loads(request.args.get('data'))
+
+	if toAdd:
+		setData(databaseName,toAdd)
 	else:
-		raise Error('Parameters missing', status_code=410)
+		raise Error('Missing parameters', status_code=410)
 	return success()
 
+
+
+@app.route("/databases/<databaseName>/data", defaults={'key': None}, methods=['DELETE'])
 @app.route("/databases/<databaseName>/data/<key>", methods=['DELETE'])
 def removeData(databaseName,key):
-	deleteData(databaseName,key)
+	toDelete = []
+	if key != None:
+		toDelete.append(key)
+	elif request.args.get('keys'):
+		toDelete = json.loads(request.args.get('keys'))
+
+	if toDelete:
+		deleteData(databaseName,toDelete)
+	else :
+		raise Error('Missing parameters', status_code=410)
 	return success()
+
 
 @app.route("/databases/<databaseName>", methods=['DELETE'])
 def removeDB(databaseName):
