@@ -3,9 +3,33 @@ import json, redis
 
 app = Flask(__name__)
 
-
-# DATABASE NAME POOL
 DB_POOL = redis.ConnectionPool(host='api_redis', port=6379, db=0)
+
+###############
+# Exception
+###############
+
+class Error(Exception):
+	status_code = 400
+
+	def __init__(self, message, status_code=None, payload=None):
+		Exception.__init__(self)
+ 		self.message = message
+		if status_code is not None:
+			self.status_code = status_code
+		self.payload = payload
+
+	def to_dict(self):
+		rv = dict(self.payload or ())
+		rv['message'] = self.message
+		return rv
+
+
+
+#############
+# Functions
+#############
+
 
 #
 # Retreive the Redis Server acting as a registry for all databases name
@@ -16,8 +40,8 @@ def getRedisDbRegistryServer():
 #
 # Retreive the Redis Server for a database according to its name
 #
-def getRedisServer(databaseName):
-	pool = redis.ConnectionPool(host='api_redis', port=6379, db=getDBIndex(databaseName))
+def getRedisServer(databaseName,readOnly=False):
+	pool = redis.ConnectionPool(host='api_redis', port=6379, db=getDBIndex(databaseName,readOnly))
 	return redis.Redis(connection_pool=pool)
 
 #
@@ -31,7 +55,7 @@ def setData(databaseName,key,value):
 # Add an entry to a Redis Server according to the database name and the key
 #
 def getData(databaseName,key):
-	redisServer = getRedisServer(databaseName)
+	redisServer = getRedisServer(databaseName,True)
 	return redisServer.get(key)
 
 
@@ -48,7 +72,7 @@ def deleteData(databaseName,key):
 #
 def getAllData(databaseName):
 	returnValue = {}
-	redisServer = getRedisServer(databaseName)
+	redisServer = getRedisServer(databaseName,True)
 	for key in redisServer.keys():
 		returnValue[key] = redisServer.get(key)
 	return returnValue
@@ -75,12 +99,14 @@ def getAllDatabases():
 #
 # Get the index of a database in the registry of databases
 #
-def getDBIndex(databaseName):
+def getDBIndex(databaseName,readOnly=False):
 	redisServer = getRedisDbRegistryServer()
 	returnValue = redisServer.get(databaseName)
-	if (returnValue == None):
+	if returnValue == None and not readOnly:
 		returnValue = getNextDBIndex()
 		redisServer.set(databaseName, returnValue)
+	if returnValue == None:
+		raise Error('Could not find server with this name', status_code=410)
 	return returnValue
 
 
@@ -111,35 +137,46 @@ def deleteDBIndex(databaseName):
 # Return the result success
 #
 def success():
-	return json.dumps("true");
+	return jsonify({"message":"Success"});
 
-#
+#############
+# Handlers
+#############
+
+@app.errorhandler(Error)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+#############
 # Routes
-#
+#############
+
 @app.route('/status')
 def check_status():
-	returnValue = {"status":"true"}
-	return json.dumps(returnValue)
+	returnValue = {"status":True}
+	return jsonify(returnValue)
 
 
 @app.route("/databases/", methods=['GET'])
 def readAllDatabases():
-	return json.dumps(getAllDatabases())
+	return jsonify(getAllDatabases())
 
 
 @app.route("/databases/<databaseName>/data", defaults={'key': None}, methods=['GET'])
 @app.route("/databases/<databaseName>/data/<key>", methods=['GET'])
 def readData(databaseName,key):
-	if (key == None):
+	if key == None:
 		if request.args.get('keys'):
 			returnValue = {}
 			for key in json.loads(request.args.get('keys')):
 				returnValue[key] = getData(databaseName,key)
-			return json.dumps(returnValue)
+			return jsonify(returnValue)
 		else:
-			return json.dumps(getAllData(databaseName))
+			return jsonify(getAllData(databaseName))
 	else:
-		return json.dumps({key:getData(databaseName,key)})
+		return jsonify({key:getData(databaseName,key)})
 
 
 @app.route("/databases/<databaseName>/data", methods=['PUT','POST'])
@@ -150,6 +187,8 @@ def addData(databaseName):
 		data = json.loads(request.args.get('data'))
 		for key in data:
 			setData(databaseName,key,data[key])
+	else:
+		raise Error('Parameters missing', status_code=410)
 	return success()
 
 @app.route("/databases/<databaseName>/data/<key>", methods=['DELETE'])
