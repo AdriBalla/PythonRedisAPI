@@ -58,7 +58,7 @@ def getAllDatabases():
 def setData(databaseName,dictionary):
 	redisServer = getRedisServer(databaseName)
 	for key in dictionary:
-	   redisServer.set(key, dictionary[key])
+		redisServer.set(key, dictionary[key])
 
 #
 # Get entries to a Redis Server according to the database name and array of keys
@@ -66,8 +66,9 @@ def setData(databaseName,dictionary):
 def getData(databaseName,keys):
 	returnValue = {}
 	redisServer = getRedisServer(databaseName,True)
-	for key in keys:
-		returnValue[key] = redisServer.get(key)
+	if redisServer:
+		for key in keys:
+			returnValue[key] = redisServer.get(key)
 	return returnValue
 
 #
@@ -93,7 +94,7 @@ def deleteData(databaseName,keys):
 #
 def deleteAllData(databaseName):
 	redisServer = getRedisServer(databaseName)
-	deleteData(redisServer.keys())
+	deleteData(databaseName,redisServer.keys())
 
 
 
@@ -107,8 +108,8 @@ def getDBIndex(databaseName,readOnly=False):
 	if returnValue == None and not readOnly:
 		returnValue = getNextDBIndex()
 		redisServer.set(databaseName, returnValue)
-	if returnValue == None:
-		raise Error('Could not find server with this name', status_code=410)
+	if returnValue == None :
+		raise Error('Cannot find server', status_code=410)
 	return returnValue
 
 
@@ -125,6 +126,8 @@ def getNextDBIndex():
 		if not (x in dbIndexs):
 			returnValue = x
 			break
+	if returnValue == None:
+		raise Error('Cannot add new server', status_code=410)
 	return returnValue
 
 
@@ -189,10 +192,10 @@ def readData(databaseName,key):
 @app.route("/databases/<databaseName>/data", methods=['PUT','POST'])
 def addData(databaseName):
 	toAdd = {}
-	if request.args.get('key') and request.args.get('value'):
-		toAdd[request.args.get('key')] = request.args.get('value')
-	elif request.args.get('data'):
-		toAdd = json.loads(request.args.get('data'))
+	if request.form.get('key') and request.form.get('value'):
+		toAdd[request.form.get('key')] = request.form.get('value')
+	elif request.form.get('data'):
+		toAdd = json.loads(request.form.get('data'))
 
 	if toAdd:
 		setData(databaseName,toAdd)
@@ -201,15 +204,14 @@ def addData(databaseName):
 	return success()
 
 
-
 @app.route("/databases/<databaseName>/data", defaults={'key': None}, methods=['DELETE'])
 @app.route("/databases/<databaseName>/data/<key>", methods=['DELETE'])
 def removeData(databaseName,key):
 	toDelete = []
 	if key != None:
 		toDelete.append(key)
-	elif request.args.get('keys'):
-		toDelete = json.loads(request.args.get('keys'))
+	elif request.form.get('keys'):
+		toDelete = json.loads(request.form.get('keys'))
 
 	if toDelete:
 		deleteData(databaseName,toDelete)
